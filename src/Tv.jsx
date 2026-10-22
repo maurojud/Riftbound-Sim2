@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CardView, CardList, StackCol, extraBattlefields, seatColor, useG } from './Table'
+import { stackEntries } from './game'
 
 // Fernseher / Zuschauer: der Bildschirm wird in gleich hohe Reihen geteilt.
 //   Reihe pro Spieler:  Stapel | Runen (bis 12, leicht versetzt) | Base | Legend + Champion
@@ -183,7 +184,15 @@ export function TvTable({ players, headH = 56 }) {
   const cw0 = Math.floor((rowH - 30) / 1.4)
   // Breite begrenzt die Kartengröße zusätzlich (Stack rechts + 4 Spalten)
   const cw = clamp(Math.min(cw0, Math.floor((w - 80) / 9.6)), 34, 210)
-  const stw = Math.round(cw * 1.1) + 40
+  // Stack: schmal, solange er leer ist; mit Karten passt sich die Breite an die Kartengröße an, sodass kein Scrollen nötig ist
+  const nSt = stackEntries(players).length
+  const midH = two ? rowH * 2 + 4 : Math.max(1, bfs.length) * (rowH + 4)
+  const availH = midH - 130
+  const swMax = Math.round(cw * 1.6)
+  let sw = Math.min(swMax, Math.floor((availH - Math.max(0, nSt - 1) * 8) / Math.max(1, nSt) / 1.4))
+  let sov = 0
+  if (sw < 46) { sw = 46; sov = nSt > 1 ? Math.max(-Math.round(46 * 1.4 * 0.8), Math.floor((availH - nSt * 64.4) / (nSt - 1)) - 8) : 0 }
+  const stw = nSt ? Math.min(sw + 34, Math.floor(w * 0.25)) : 66
   const Wc = w - stw - 22
   const Wf = w - 14
   const topP = players.slice(0, nTop)
@@ -198,7 +207,7 @@ export function TvTable({ players, headH = 56 }) {
             ? bfs.map((b) => <Band key={b.key} bf={b} players={players} cw={cw} W={Wc} />)
             : <div className="band empty"><span className="muted">Battlefields werden gewählt…</span></div>}
         </div>
-        <div className="tv2-stack" style={{ width: stw }}><StackCol /></div>
+        <div className={'tv2-stack' + (nSt ? '' : ' empty')} style={{ width: stw, '--sw': sw + 'px', '--sov': sov + 'px' }}><StackCol /></div>
       </div>
       {botP.map(prow)}
     </div>

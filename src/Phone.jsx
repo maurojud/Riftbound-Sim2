@@ -281,13 +281,48 @@ function bfInstOf(P, key) {
   return P.players.flatMap((p) => p.state?.zones.bfExtra || []).find((i) => 'x' + i.id === key)
 }
 
+// Nur ansehen (Base des Gegners): große Karte, sonst nichts
+function ViewSheet({ P, seat, id, onClose }) {
+  const pl = P.players.find((p) => p.seat === seat)
+  const f = pl?.state && findInst(pl.state, id)
+  const card = f && P.cards[f.inst.cardId]
+  const hidden = !card || f?.inst.faceDown
+  return (
+    <Sheet title={hidden ? 'Verdeckt' : card.name} onClose={onClose}>
+      <div className="bigimg">{hidden ? <div className="back" style={{ width: 200, aspectRatio: '5/7' }} /> : <CardImg src={card.image_url} alt={card.name} battlefield={kindOf(card) === 'battlefield'} />}</div>
+      {f && chipsOf(f.inst).length > 0 && <div className="tchips center">{chipsOf(f.inst).map((c) => <i key={c}>{c}</i>)}</div>}
+    </Sheet>
+  )
+}
+
+function OppBase({ P, seat, onView }) {
+  const pl = P.players.find((p) => p.seat === seat)
+  const list = pl?.state?.zones.base || []
+  return (
+    <>
+      <h4 className="opph" style={{ color: seatColor(seat) }}><span className="dot" style={{ background: seatColor(seat) }} /> {pl?.name}</h4>
+      {list.length === 0 && <p className="muted center pad"><Icon n="base" size={28} /></p>}
+      <div className="hgrid">
+        {list.map((inst) => {
+          const c = P.cards[inst.cardId]
+          const hidden = !c || inst.faceDown
+          return (
+            <button key={inst.id} className={'hcard plain' + (inst.tapped ? ' tapped' : '')} onClick={() => onView(seat, inst.id)} aria-label={hidden ? 'Verdeckt' : c.name}>
+              {hidden ? <div className="back" /> : <CardImg src={c.image_url} alt={c.name} />}
+            </button>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
 // Eine Zone als Reiter: eigene Karten groß (Tippen = verschieben, lang = Details), Karten der Gegner klein darunter
 function ZoneView({ P, tab, open, openMove }) {
   const mine = P.mine.zones
   let own = [], others = [], bf = null
   if (tab === 'base') {
     own = mine.base
-    others = P.players.filter((p) => p.seat !== P.mySeat && p.state).map((p) => ({ p, list: p.state.zones.base }))
   } else {
     bf = bfInstOf(P, tab)
     const at = (z) => (z.bfUnits || []).filter((i) => String(i.at) === String(tab))
@@ -338,14 +373,14 @@ export default function PhoneApp({ P, onLeave }) {
   const lpDeck = useLongPress(() => P.drawCard(), (e) => P.pileMenu('deck', e))
   const openDetail = (seat, id) => setSheet({ t: 'detail', seat, id })
   // Der übergeordnete Code kann ebenfalls Blätter öffnen (z. B. Pfeil-Chip im Stack)
-  P.ui.current = { open: setSheet, detail: openDetail }
-  const champ = P.mine.zones.champion[0]
+  P.ui.current = { open: (x) => (x?.t === 'stack' ? (setSheet(null), setTab('stack')) : setSheet(x)), detail: openDetail }
+  const champs = P.mine.zones.champion
+  const opps = P.players.filter((p) => p.seat !== P.mySeat && p.state)
   const legend = P.mine.zones.legend[0]
   const menuItems = [
     ['cards', 'Karten im Spiel ansehen', () => setSheet({ t: 'inplay' })],
     legend && ['legend', legend.tapped ? 'Legend enttappen' : 'Legend tappen', () => { P.act((p) => toggleFlag(p, legend.id, 'tapped')); close() }],
     ['token', 'Token auswählen', () => { close(); P.openModal('tokens') }],
-    champ && ['champion', 'Champion aus der Championzone spielen', () => setSheet({ t: 'play', id: champ.id, zone: 'champion' })],
     ['stack', 'Ganzer Tisch ansehen', () => { close(); P.showTable() }],
     ['rune', 'Runen bearbeiten', () => setSheet({ t: 'runes' })],
     ['trash', 'Trash und Banish ansehen', () => setSheet({ t: 'zones' })],
@@ -366,32 +401,47 @@ export default function PhoneApp({ P, onLeave }) {
           <IconBtn n="rune" label="Rune ziehen" badge={P.mine.zones.runeDeck.length} className="big" {...lpRune} />
           <IconBtn n="deck" label="Karte ziehen" badge={P.mine.zones.deck.length} className="big" {...lpDeck} />
           <IconBtn n="untap" label="Alles enttappen" className="big" onClick={() => P.act(untapAll)} />
-          <IconBtn n="stack" label="Stack" badge={stackN || null} className="big" onClick={() => setSheet({ t: 'stack' })} />
           <IconBtn n="menu" label="Menü" className="big" onClick={() => setSheet({ t: 'menu' })} />
         </div>
       </header>
       <nav className="ph-tabs" role="tablist">
-        {[['hand', 'hand', hand.length, null], ['base', 'base', P.mine.zones.base.length, null],
-          ...P.bfSeats.map((k, i) => [k, 'flag', P.players.flatMap((p) => (p.state?.zones.bfUnits || []).filter((u) => String(u.at) === String(k))).length, i + 1])].map(([k, ic, n, num]) => (
-          <button key={String(k)} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)} aria-label={String(k)}>
-            <Icon n={ic} size={26} />{num != null && <b>{num}</b>}{n > 0 && <span className="ibadge">{n}</span>}
+        {[['hand', 'hand', hand.length + champs.length, null, null],
+          ['base', 'base', P.mine.zones.base.length, null, null],
+          ...opps.map((p) => ['ob' + p.seat, 'base', p.state.zones.base.length, null, seatColor(p.seat)]),
+          ...P.bfSeats.map((k, i) => [k, 'flag', P.players.flatMap((p) => (p.state?.zones.bfUnits || []).filter((u) => String(u.at) === String(k))).length, i + 1, null]),
+          ['stack', 'stack', stackN, null, null]].map(([k, ic, n, num, col]) => (
+          <button key={String(k)} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)} aria-label={String(k)} style={col ? { boxShadow: `inset 0 -4px 0 ${col}` } : undefined}>
+            <Icon n={ic} size={24} />{num != null && <b>{num}</b>}{n > 0 && <span className="ibadge">{n}</span>}
           </button>
         ))}
       </nav>
       <main className="ph-hand">
         {tab === 'hand' ? (
           <>
-            {hand.length === 0 && <p className="muted center pad">Keine Handkarten. Tippe auf das Deck-Symbol, um zu ziehen.</p>}
+            {hand.length === 0 && champs.length === 0 && <p className="muted center pad">Keine Handkarten. Tippe auf das Deck-Symbol, um zu ziehen.</p>}
             <div className="hgrid">
               {hand.map((inst) => (
                 <HandCard key={inst.id} P={P} inst={inst} onTap={() => setSheet({ t: 'play', id: inst.id, zone: 'hand' })} onLong={() => openDetail(P.mySeat, inst.id)} />
               ))}
             </div>
+            {champs.length > 0 && (
+              <div className="oppzone">
+                <h4><Icon n="champion" size={16} /> Championzone</h4>
+                <div className="hgrid">
+                  {champs.map((inst) => (
+                    <HandCard key={inst.id} P={P} inst={inst} zone="champion" onTap={() => setSheet({ t: 'play', id: inst.id, zone: 'champion' })} onLong={() => openDetail(P.mySeat, inst.id)} />
+                  ))}
+                </div>
+              </div>
+            )}
           </>
-        ) : <ZoneView P={P} tab={tab} open={openDetail} openMove={(id) => setSheet({ t: 'play', id, zone: 'move' })} />}
+        ) : tab === 'stack' ? <div className="stackwrap"><StackCol /></div>
+          : typeof tab === 'string' && tab.startsWith('ob') ? <OppBase P={P} seat={Number(tab.slice(2))} onView={(seat, id) => setSheet({ t: 'view', seat, id })} />
+          : <ZoneView P={P} tab={tab} open={openDetail} openMove={(id) => setSheet({ t: 'play', id, zone: 'move' })} />}
       </main>
 
       {sheet?.t === 'play' && (() => { const f = findInst(P.mine, sheet.id); return f ? <PlaySheet key={sheet.id} P={P} inst={f.inst} zone={f.zone} onClose={close} move={!['hand', 'champion'].includes(f.zone)} onDetail={() => openDetail(P.mySeat, f.inst.id)} /> : null })()}
+      {sheet?.t === 'view' && <ViewSheet P={P} seat={sheet.seat} id={sheet.id} onClose={close} />}
       {sheet?.t === 'detail' && <DetailSheet key={sheet.id} P={P} seat={sheet.seat} id={sheet.id} onClose={close} />}
       {sheet?.t === 'inplay' && (
         <Sheet title="Karten im Spiel" onClose={close} tall>

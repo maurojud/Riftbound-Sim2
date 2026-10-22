@@ -172,3 +172,15 @@ html, body { overscroll-behavior: none; }
 .bfcard2 { position: relative; }
 .bfcard2 .card.land { width: calc(var(--cw) * 1.4); }
 .bfcard2 .card { --w: calc(var(--cw) * 1.4); width: var(--w); }
+.tv2-stack .stackcol .card, .tv2-stack .stackcol .card.xs { --w: var(--sw); width: var(--sw); }
+.tv2-stack .stack-list { overflow: hidden; gap: 8px; min-height: 0; }
+.tv2-stack .st-item + .st-item { margin-top: var(--sov, 0); }
+.tv2-stack.empty .stack-empty, .tv2-stack.empty .stack-ctl { display: none; }
+.tv2-stack .stackcol { padding: 6px 4px; }
+.ph .stackcol { --cw: 80px; }
+.ph .stackcol .card, .ph .stackcol .card.xs { --w: 130px; width: 130px; }
+.hcard.plain { display: block; padding: 0; border: 0; background: none; min-height: 0; }
+.opph { margin: 0 0 8px; display: flex; gap: 6px; align-items: center; font-size: .9rem; }
+.ph-tabs { gap: 4px; padding: 6px 6px; }
+.ph-tabs button { min-width: 0; }
+.ph-tabs .ibadge { top: -5px; right: -3px; }

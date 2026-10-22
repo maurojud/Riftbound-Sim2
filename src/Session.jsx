@@ -206,7 +206,15 @@ export default function Session({ id, view, user }) {
   function payThen(instId, to, run) {
     const cur = findInst(mineRef.current, instId)
     const card = cur && cards[cur.inst.cardId]
-    const play = !!cur && ['hand', 'champion'].includes(cur.zone) && (to === 'stack' || to === 'base' || to.startsWith('bf:')) && !cur.inst.faceDown && !cur.inst.token
+    const board = to === 'base' || to.startsWith('bf:')
+    // Verdeckt spielen (Hide): immer 1 Power, die Rune wird per Fenster gewählt
+    if (auto.pay && cur && cur.zone === 'hand' && cur.inst.faceDown && !cur.inst.token && board) {
+      const cand = mineRef.current.zones.runes.filter((r) => !r.floating)
+      if (!cand.length) { say(`„${card?.name || 'Karte'}“ kann nicht verdeckt gespielt werden: Es fehlt 1 Power (keine Runen).`); return undefined }
+      const colors = [...new Set(cand.map((r) => cards[r.cardId]?.color).filter(Boolean))]
+      return setPayAsk({ cost: { energy: 0, power: 1, colors }, choice: { n: 1, candidates: cand.map((r) => r.id) }, run, name: (card?.name || 'Karte') + ' (verdeckt)', saved: null })
+    }
+    const play = !!cur && ['hand', 'champion'].includes(cur.zone) && (to === 'stack' || board) && !cur.inst.faceDown && !cur.inst.token
     if (!play || !auto.pay) return act(run)
     const aff = afford(instId)
     if (!aff.known) {

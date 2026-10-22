@@ -74,13 +74,23 @@ export const kindOf = (c) => (c?.kind || '').toLowerCase()
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 
-// Mehrfach mischen (5 bis 8 Durchgänge), damit auch eine sortierte Ausgangsreihenfolge sicher durchmischt ist
+// Zufallszahl 0..n-1 aus dem Zufallsgenerator des Browsers (kryptografisch), ohne Verzerrung; Math.random nur als Notlösung
+function randInt(n) {
+  const c = globalThis.crypto
+  if (!c?.getRandomValues || n < 2) return n < 2 ? 0 : Math.floor(Math.random() * n)
+  const max = Math.floor(0x100000000 / n) * n
+  const buf = new Uint32Array(1)
+  do { c.getRandomValues(buf) } while (buf[0] >= max)
+  return buf[0] % n
+}
+
+// Mischen: 20 bis 30 Durchgänge Fisher-Yates mit echtem Zufall (jede Reihenfolge gleich wahrscheinlich)
 export function shuffled(arr) {
   const r = [...arr]
-  const passes = 5 + Math.floor(Math.random() * 4)
+  const passes = 20 + randInt(11)
   for (let k = 0; k < passes; k++) {
     for (let i = r.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
+      const j = randInt(i + 1)
       ;[r[i], r[j]] = [r[j], r[i]]
     }
   }

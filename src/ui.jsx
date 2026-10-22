@@ -71,11 +71,12 @@ export function useLongPress(onTap, onLong, ms = 460) {
       const s = st.current
       if (!s.moved && Math.hypot(e.clientX - s.x, e.clientY - s.y) > 10) { s.moved = true; clearTimeout(s.t) }
     },
-    onPointerUp: () => {
+    onPointerUp: () => { clearTimeout(st.current.t) },
+    // Tippen erst beim click auslösen: so landet der nachgelieferte Touch-click nicht auf dem neu geöffneten Fenster
+    onClick: () => {
       const s = st.current
-      clearTimeout(s.t)
-      if (!s.long && !s.moved) onTap?.()
-      s.long = true // verhindert doppeltes Auslösen durch click
+      if (s.long || s.moved) return
+      onTap?.()
     },
     onPointerCancel: () => { clearTimeout(st.current.t); st.current.moved = true },
     onContextMenu: (e) => { e.preventDefault() },
@@ -84,8 +85,9 @@ export function useLongPress(onTap, onLong, ms = 460) {
 
 // Unterer Einschub (Handy): dunkler Hintergrund, Tippen daneben schließt
 export function Sheet({ title, onClose, children, tall, head }) {
+  const t0 = useRef(Date.now())
   return (
-    <div className="sheet-bg" onClick={onClose}>
+    <div className="sheet-bg" onClick={() => { if (Date.now() - t0.current > 400) onClose?.() }}>
       <div className={'sheet' + (tall ? ' tall' : '')} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
         <div className="sheet-head">
           {onClose && <IconBtn n="close" label="Schließen" onClick={onClose} className="sm" />}

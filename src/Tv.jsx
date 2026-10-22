@@ -147,19 +147,22 @@ export function TvTable({ players, headH = 56 }) {
   const cw = clamp(Math.min(cw0, Math.floor((w - 80) / 9.6)), 34, 210)
   const stw = Math.round(cw * 1.1) + 40
   const Wc = w - stw - 22
+  const Wf = w - 14
   const topP = players.slice(0, nTop)
   const botP = players.slice(nTop)
-  const prow = (p) => <PlayerRow key={p.seat} player={p} cw={cw} W={Wc} color={seatColor(p.seat)} />
+  const prow = (p) => <PlayerRow key={p.seat} player={p} cw={cw} W={Wf} color={seatColor(p.seat)} />
   return (
     <div className="tv2" style={{ '--cw': cw + 'px', '--rowh': rowH + 'px', '--stw': stw + 'px', height: h - headH }}>
-      <div className="tv2-main" style={{ width: Wc }}>
-        {topP.map(prow)}
-        {bfs.length
-          ? bfs.map((b) => <Band key={b.key} bf={b} players={players} cw={cw} W={Wc} />)
-          : <div className="band empty"><span className="muted">Battlefields werden gewählt…</span></div>}
-        {botP.map(prow)}
+      {topP.map(prow)}
+      <div className="tv2-mid">
+        <div className="tv2-main" style={{ width: Wc }}>
+          {bfs.length
+            ? bfs.map((b) => <Band key={b.key} bf={b} players={players} cw={cw} W={Wc} />)
+            : <div className="band empty"><span className="muted">Battlefields werden gewählt…</span></div>}
+        </div>
+        <div className="tv2-stack" style={{ width: stw }}><StackCol /></div>
       </div>
-      <div className="tv2-stack" style={{ width: stw }}><StackCol /></div>
+      {botP.map(prow)}
     </div>
   )
 }

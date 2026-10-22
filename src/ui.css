@@ -94,7 +94,7 @@ html, body { overscroll-behavior: none; }
 /* ===== TV-Layout ===== */
 .tv2root { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 .tv2bar { flex: none; display: flex; align-items: center; gap: 18px; padding: 6px 16px; background: #0a0f16cc; font-size: .95rem; height: 56px; box-sizing: border-box; overflow: hidden; }
-.tv2 { display: flex; gap: 8px; padding: 4px 6px; box-sizing: border-box; overflow: hidden; }
+.tv2 { display: flex; flex-direction: column; gap: 4px; padding: 4px 6px; box-sizing: border-box; overflow: hidden; }
 .tv2-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: none; }
 .tv2-stack { flex: none; overflow: hidden; }
 .tv2-stack .stackcol { position: static; width: 100%; height: 100%; max-height: none; top: auto; }
@@ -142,3 +142,8 @@ html, body { overscroll-behavior: none; }
 .minigrid .mini, .minigrid .mini.empty { width: var(--mw); height: calc(var(--mw) * 1.4); aspect-ratio: auto; min-height: 0; padding: 0; margin: 0; display: block; }
 .mini.empty { display: grid; place-items: center; }
 .mini .back, .hcard .back, .timg .back, .thumb2 .back { background: repeating-linear-gradient(45deg, #3a4d66 0 6px, #2b3a4f 6px 12px); border: 2px solid var(--gold); box-sizing: border-box; }
+.tv2-mid { display: flex; gap: 8px; flex: none; }
+.tv2-stack { align-self: stretch; }
+.prow, .band, .tv2-mid, .tv2-main { flex: none; }
+.tv2-stack { position: relative; }
+.tv2-stack > .stackcol { position: absolute !important; top: 0; left: 0; right: 0; bottom: 0; width: auto !important; height: auto; }

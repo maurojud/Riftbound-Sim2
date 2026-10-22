@@ -7,8 +7,9 @@ import { ZONES, moveCard, showCards, analyzeDeck, findInst } from './game'
 const TOKEN_ORDER = ['Unit', 'Gear', 'Spell', 'Battlefield', 'Other']
 
 export function Modal({ title, onClose, children }) {
+  const t0 = useRef(Date.now())
   return (
-    <div className="modal-bg top" onClick={onClose}>
+    <div className="modal-bg top" onClick={() => { if (Date.now() - t0.current > 400) onClose?.() }}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head"><h3>{title}</h3><button onClick={onClose}>Schließen</button></div>
         {children}

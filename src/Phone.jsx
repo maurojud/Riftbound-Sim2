@@ -93,8 +93,10 @@ function Cost({ aff }) {
 }
 
 // ───────── Karte aus Hand oder Championzone spielen: Platzieren | Targeten | Beides ─────────
-function PlaySheet({ P, inst, zone, onClose, move, onDetail }) {
-  const [tab, setTab] = useState('place')
+function PlaySheet({ P, inst, zone, onClose }) {
+  const move = !['hand', 'champion'].includes(zone)
+  const [tab, setTab] = useState(move ? 'info' : 'place')
+  const [free, setFree] = useState(false)
   const [dest, setDest] = useState(null)
   const [tgt, setTgt] = useState(null)
   const [host, setHost] = useState(false)
@@ -115,7 +117,7 @@ function PlaySheet({ P, inst, zone, onClose, move, onDetail }) {
       .filter(([k]) => allowed.includes(k)).map(([key, icon, label]) => ({ key, icon, label })) : []),
   ].filter(Boolean)
   const hasHosts = allowed.some((t) => t.startsWith('card:'))
-  const go = (fn) => { fn(); onClose() }
+  const go = (fn) => { P.freeRef.current = free; fn(); P.freeRef.current = false; onClose() }
   const DestChips = ({ noStack }) => (
     <div className="dests">
       {dests.filter((d) => !(noStack && d.key === 'stack')).map((d) => (
@@ -128,12 +130,21 @@ function PlaySheet({ P, inst, zone, onClose, move, onDetail }) {
   )
   const confirm = () => go(() => P.both(inst.id, dest, tgt))
   return (
-    <Sheet title={card?.name || 'Karte'} onClose={onClose} head={<>{!move && <Cost aff={aff} />}{move && onDetail && <IconBtn n="edit" label="Details und Werte" className="sm" onClick={onDetail} />}{canHide(card, zone) && <IconBtn n={inst.faceDown ? 'eyeoff' : 'eye'} label="Verdeckt spielen" on={inst.faceDown} className="sm" onClick={() => P.act((p) => toggleFlag(p, inst.id, 'faceDown'))} />}</>}>
-      {!move && <div className="tabs3" role="tablist">
-        {[['place', 'place', 'Platzieren'], ['target', 'aim', 'Targeten'], ['both', 'both', 'Beides']].map(([k, ic, l]) => (
-          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)} aria-label={l}><Icon n={ic} size={28} /></button>
-        ))}
-      </div>}
+    <Sheet title={card?.name || 'Karte'} onClose={onClose} tall head={<>{!move && <Cost aff={aff} />}{canHide(card, zone) && <IconBtn n={inst.faceDown ? 'eyeoff' : 'eye'} label="Verdeckt spielen" on={inst.faceDown} className="sm" onClick={() => P.act((p) => toggleFlag(p, inst.id, 'faceDown'))} />}</>}>
+      <div className="tabs3" role="tablist">
+        {(move ? [['info', 'edit', 'Werte und Aktionen'], ['place', 'place', 'Verschieben']] : [['place', 'place', 'Platzieren'], ['target', 'aim', 'Targeten'], ['both', 'both', 'Beides'], ['info', 'edit', 'Werte und Aktionen']])
+          .map(([k, ic, l]) => (
+            <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)} aria-label={l}><Icon n={ic} size={28} /></button>
+          ))}
+      </div>
+      {!move && tab !== 'info' && (
+        <div className="quick">
+          <IconBtn n="stack" label="Nur auf den Stack, ohne Ziel" className="sm" onClick={() => go(() => P.place(inst.id, 'stack'))} />
+          <IconBtn n="nocost" label="Ohne Runenkosten spielen" className="sm" on={free} onClick={() => setFree(!free)} />
+          {free && <span className="muted small">ohne Kosten</span>}
+        </div>
+      )}
+      {tab === 'info' && <DetailBody P={P} seat={P.mySeat} id={inst.id} onClose={onClose} />}
       {tab === 'place' && (<>
         <DestChips />
         {host && <><p className="muted small hint">An welche Einheit?</p><TargetList P={P} excludeId={inst.id} onlyOwn onPick={(h) => go(() => P.attach(inst.id, h.id))} /></>}
@@ -152,12 +163,14 @@ function PlaySheet({ P, inst, zone, onClose, move, onDetail }) {
 }
 
 // ───────── Einzelne Karte: groß, Zähler/Status bearbeiten, Aktionen als Symbole ─────────
-function DetailSheet({ P, seat, id, onClose }) {
+const curOf = (P, seat, id) => (seat === P.mySeat ? findInst(P.mine, id) : (P.players.find((p) => p.seat === seat)?.state && findInst(P.players.find((p) => p.seat === seat).state, id)))
+
+function DetailBody({ P, seat, id, onClose }) {
   const [sub, setSub] = useState(null) // 'arrow' | 'fx'
   const own = seat === P.mySeat
   const pl = P.players.find((p) => p.seat === seat)
   const cur = own ? findInst(P.mine, id) : pl?.state && findInst(pl.state, id)
-  if (!cur) return <Sheet title="Karte" onClose={onClose}><p className="muted pad">Die Karte ist nicht mehr da.</p></Sheet>
+  if (!cur) return <p className="muted pad">Die Karte ist nicht mehr da.</p>
   const { inst, zone } = cur
   const card = P.cards[inst.cardId]
   const isBf = kindOf(card) === 'battlefield'
@@ -188,14 +201,15 @@ function DetailSheet({ P, seat, id, onClose }) {
   }
   if (sub) {
     return (
-      <Sheet title={sub === 'arrow' ? 'Pfeil: Ziel wählen' : 'Effekt: Ziel wählen'} onClose={() => setSub(null)} head={<IconBtn n="back" label="Zurück" className="sm" onClick={() => setSub(null)} />}>
+      <>
+        <div className="subhead"><IconBtn n="back" label="Zurück" className="sm" onClick={() => setSub(null)} /><b>{sub === 'arrow' ? 'Pfeil: Ziel wählen' : 'Effekt: Ziel wählen'}</b></div>
         {sub === 'fx' && <button className="wide" onClick={() => { P.fx(id, null); onClose() }}><Icon n="fx" size={22} /> <span>Ohne Ziel</span></button>}
         <TargetList P={P} excludeId={id} onPick={(t) => { sub === 'arrow' ? P.arrow(id, t.id) : P.fx(id, t.id); onClose() }} />
-      </Sheet>
+      </>
     )
   }
   return (
-    <Sheet title={hide ? 'Verdeckte Karte' : card?.name || 'Karte'} onClose={onClose} tall>
+    <>
       <div className={'bigimg' + (isBf ? ' bf' : '')}>
         {hide ? <div className="back" /> : card && <CardImg className="big" src={card.image_url} alt={card.name} battlefield={isBf} />}
       </div>
@@ -211,6 +225,17 @@ function DetailSheet({ P, seat, id, onClose }) {
           ))}
         </div>
       )}
+    </>
+  )
+}
+
+function DetailSheet({ P, seat, id, onClose }) {
+  const cur = curOf(P, seat, id)
+  const card = cur && P.cards[cur.inst.cardId]
+  const hide = cur?.inst.faceDown && seat !== P.mySeat
+  return (
+    <Sheet title={hide ? 'Verdeckte Karte' : card?.name || 'Karte'} onClose={onClose} tall>
+      <DetailBody P={P} seat={seat} id={id} onClose={onClose} />
     </Sheet>
   )
 }
@@ -246,6 +271,18 @@ function RuneSheet({ P, onClose, open }) {
       </div>
       <p className="muted small hint">Antippen tappt oder enttappt. Gedrückt halten: oben oder unten aufs Runendeck.</p>
     </Sheet>
+  )
+}
+function RuneGrid({ P, open }) {
+  const runes = P.mine.zones.runes
+  return (
+    <>
+      <div className="thumbs runegrid">
+        {runes.map((inst) => <RuneTile key={inst.id} P={P} inst={inst} open={open} />)}
+      </div>
+      {!runes.length && <p className="muted center pad"><Icon n="rune" size={28} /></p>}
+      <p className="muted small hint center">Antippen: tappen/enttappen · gedrückt halten: oben/unten aufs Runendeck</p>
+    </>
   )
 }
 function RuneTile({ P, inst, open }) {
@@ -371,18 +408,34 @@ export default function PhoneApp({ P, onLeave }) {
   const stackN = stackEntries(P.players).length
   const lpRune = useLongPress(() => P.drawRune(), (e) => P.pileMenu('runeDeck', e))
   const lpDeck = useLongPress(() => P.drawCard(), (e) => P.pileMenu('deck', e))
-  const openDetail = (seat, id) => setSheet({ t: 'detail', seat, id })
+  // Eine Karte antippen oder gedrückt halten öffnet dasselbe Fenster (Platzieren, Targeten, Werte, Aktionen)
+  const openDetail = (seat, id) => {
+    const f = seat === P.mySeat && findInst(P.mine, id)
+    if (f && ['hand', 'champion', 'base', 'bfUnits'].includes(f.zone)) setSheet({ t: 'play', id, zone: f.zone })
+    else setSheet({ t: 'detail', seat, id })
+  }
   // Der übergeordnete Code kann ebenfalls Blätter öffnen (z. B. Pfeil-Chip im Stack)
   P.ui.current = { open: (x) => (x?.t === 'stack' ? (setSheet(null), setTab('stack')) : setSheet(x)), detail: openDetail }
   const champs = P.mine.zones.champion
   const opps = P.players.filter((p) => p.seat !== P.mySeat && p.state)
+  const bfCount = (k) => P.players.flatMap((p) => (p.state?.zones.bfUnits || []).filter((u) => String(u.at) === String(k))).length
+  // Reihenfolge: Hand, eigene Base, eigenes Battlefield, Zusatz-Battlefields, gegnerische Battlefields, gegnerische Base, Runen, Stack
+  const tabList = [
+    ['hand', 'hand', hand.length + champs.length, null],
+    ['base', 'base', P.mine.zones.base.length, null],
+    ...P.bfSeats.filter((k) => k === P.mySeat).map((k) => [k, 'flag', bfCount(k), seatColor(k)]),
+    ...P.bfSeats.filter((k) => typeof k !== 'number').map((k) => [k, 'flag', bfCount(k), null]),
+    ...P.bfSeats.filter((k) => typeof k === 'number' && k !== P.mySeat).map((k) => [k, 'flag', bfCount(k), seatColor(k)]),
+    ...opps.map((p) => ['ob' + p.seat, 'base', p.state.zones.base.length, seatColor(p.seat)]),
+    ['runes', 'rune', P.mine.zones.runes.filter((r) => !r.tapped).length, null],
+    ['stack', 'stack', stackN, null],
+  ]
   const legend = P.mine.zones.legend[0]
   const menuItems = [
     ['cards', 'Karten im Spiel ansehen', () => setSheet({ t: 'inplay' })],
     legend && ['legend', legend.tapped ? 'Legend enttappen' : 'Legend tappen', () => { P.act((p) => toggleFlag(p, legend.id, 'tapped')); close() }],
     ['token', 'Token auswählen', () => { close(); P.openModal('tokens') }],
     ['stack', 'Ganzer Tisch ansehen', () => { close(); P.showTable() }],
-    ['rune', 'Runen bearbeiten', () => setSheet({ t: 'runes' })],
     ['trash', 'Trash und Banish ansehen', () => setSheet({ t: 'zones' })],
     ['deck', 'Deck: oberste Karten ansehen', () => { close(); P.openModal('look', 'deck') }],
     ['rune', 'Runendeck: oberste Karten ansehen', () => { close(); P.openModal('look', 'runeDeck') }],
@@ -405,13 +458,9 @@ export default function PhoneApp({ P, onLeave }) {
         </div>
       </header>
       <nav className="ph-tabs" role="tablist">
-        {[['hand', 'hand', hand.length + champs.length, null, null],
-          ['base', 'base', P.mine.zones.base.length, null, null],
-          ...opps.map((p) => ['ob' + p.seat, 'base', p.state.zones.base.length, null, seatColor(p.seat)]),
-          ...P.bfSeats.map((k, i) => [k, 'flag', P.players.flatMap((p) => (p.state?.zones.bfUnits || []).filter((u) => String(u.at) === String(k))).length, i + 1, null]),
-          ['stack', 'stack', stackN, null, null]].map(([k, ic, n, num, col]) => (
+        {tabList.map(([k, ic, n, col]) => (
           <button key={String(k)} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)} aria-label={String(k)} style={col ? { boxShadow: `inset 0 -4px 0 ${col}` } : undefined}>
-            <Icon n={ic} size={24} />{num != null && <b>{num}</b>}{n > 0 && <span className="ibadge">{n}</span>}
+            <Icon n={ic} size={24} />{n > 0 && <span className="ibadge">{n}</span>}
           </button>
         ))}
       </nav>
@@ -435,12 +484,13 @@ export default function PhoneApp({ P, onLeave }) {
               </div>
             )}
           </>
-        ) : tab === 'stack' ? <div className="stackwrap"><StackCol /></div>
+        ) : tab === 'runes' ? <RuneGrid P={P} open={openDetail} />
+          : tab === 'stack' ? <div className="stackwrap"><StackCol /></div>
           : typeof tab === 'string' && tab.startsWith('ob') ? <OppBase P={P} seat={Number(tab.slice(2))} onView={(seat, id) => setSheet({ t: 'view', seat, id })} />
           : <ZoneView P={P} tab={tab} open={openDetail} openMove={(id) => setSheet({ t: 'play', id, zone: 'move' })} />}
       </main>
 
-      {sheet?.t === 'play' && (() => { const f = findInst(P.mine, sheet.id); return f ? <PlaySheet key={sheet.id} P={P} inst={f.inst} zone={f.zone} onClose={close} move={!['hand', 'champion'].includes(f.zone)} onDetail={() => openDetail(P.mySeat, f.inst.id)} /> : null })()}
+      {sheet?.t === 'play' && (() => { const f = findInst(P.mine, sheet.id); return f ? <PlaySheet key={sheet.id} P={P} inst={f.inst} zone={f.zone} onClose={close} /> : null })()}
       {sheet?.t === 'view' && <ViewSheet P={P} seat={sheet.seat} id={sheet.id} onClose={close} />}
       {sheet?.t === 'detail' && <DetailSheet key={sheet.id} P={P} seat={sheet.seat} id={sheet.id} onClose={close} />}
       {sheet?.t === 'inplay' && (

@@ -184,3 +184,31 @@ html, body { overscroll-behavior: none; }
 .ph-tabs { gap: 4px; padding: 6px 6px; }
 .ph-tabs button { min-width: 0; }
 .ph-tabs .ibadge { top: -5px; right: -3px; }
+.subhead { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.quick { display: flex; align-items: center; gap: 10px; padding: 8px 10px 0; }
+.runegrid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+.ph-tabs { overflow-x: auto; }
+.ph-tabs button { flex: 1 0 44px; }
+
+/* ===== Fernseher: große, kontrastreiche Zahlen, Runen als Punkte, Marken in Kartenmitte ===== */
+.tv2 .z2t { font-size: 1.35rem; color: #fff; gap: 10px; }
+.tv2 .pname { font-size: 1.6rem; }
+.bigpts { display: inline-grid; place-items: center; min-width: 2.1rem; height: 2.1rem; padding: 0 8px; border-radius: 999px; background: var(--sc, var(--gold)); color: #0a0e14; font-size: 1.7rem; font-weight: 900; line-height: 1; }
+.bignum { font-size: 1.35rem; color: #fff; white-space: nowrap; }
+.bignum b { font-size: 1.9rem; font-weight: 900; color: #fff; }
+.bignum .muted { color: #b9c6d8; font-size: 1.1rem; }
+.tv2 .ptrack i { width: 15px; height: 15px; background: #ffffff33; }
+.tv2 .ptrack { gap: 4px; }
+.tv2 .halft { font-size: 1.15rem; color: #fff; }
+.tv2 .bf2t { font-size: 1.05rem; color: #fff; }
+.runes .z2c { align-items: center; justify-content: center; }
+.rdots { display: grid; grid-template-columns: repeat(4, var(--d)); grid-auto-rows: var(--d); gap: 8px; align-content: center; }
+.rdot { display: block; width: var(--d); height: var(--d); border-radius: 50%; box-sizing: border-box; border: 4px solid var(--rc); background: var(--rc); box-shadow: 0 0 0 2px #0a0e14; }
+.rdot.off { background: transparent; opacity: .85; }
+.tv2 .marks { top: 50%; bottom: auto; left: 0; right: 0; transform: translateY(-50%); flex-direction: column; align-items: center; justify-content: center; gap: 4px; z-index: 6; }
+.tv2 .mk { font-size: max(15px, calc(var(--w) * .22)); padding: 1px 10px; border-radius: 8px; border: 2px solid #fff; color: #fff; text-shadow: 0 1px 2px #000; box-shadow: 0 2px 6px #000c; line-height: 1.25; }
+.tv2 .mk.buff { background: #1f9d55; } .tv2 .mk.damage { background: #e0322a; } .tv2 .mk.might { background: #2a6fd6; }
+.tv2 .mk.marker { background: #7a4fd0; } .tv2 .mk.stunned { background: #c48a00; }
+.tv2bar { font-size: 1.3rem; color: #fff; }
+.runegrid .thumb2 { width: 100%; }
+.runegrid .thumb2 img, .runegrid .thumb2 .cardimg { width: 100%; height: auto; }

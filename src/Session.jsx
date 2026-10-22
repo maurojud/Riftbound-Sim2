@@ -41,6 +41,7 @@ export default function Session({ id, view, user }) {
   const [showTable, setShowTable] = useState(false)
   const [auto, setAutoState] = useState(() => { try { return { pay: true, exhaust: true, ...JSON.parse(localStorage.getItem('rt:auto')) } } catch { return { pay: true, exhaust: true } } })
   const setAuto = (patch) => setAutoState((a) => { const n = { ...a, ...patch }; try { localStorage.setItem('rt:auto', JSON.stringify(n)) } catch { /* egal */ } return n })
+  const freeRef = useRef(false)                    // gilt nur für die nächste Aktion: Kosten ignorieren
   const [payAsk, setPayAsk] = useState(null)      // Rückfrage: welche Runen sollen für Power recycelt werden?
   const [notice, setNotice] = useState('')
   const noticeT = useRef(null)
@@ -207,6 +208,7 @@ export default function Session({ id, view, user }) {
     const cur = findInst(mineRef.current, instId)
     const card = cur && cards[cur.inst.cardId]
     const board = to === 'base' || to.startsWith('bf:')
+    if (freeRef.current) { freeRef.current = false; return act(run) }
     // Verdeckt spielen (Hide): immer 1 Power, die Rune wird per Fenster gewählt
     if (auto.pay && cur && cur.zone === 'hand' && cur.inst.faceDown && !cur.inst.token && board) {
       const cand = mineRef.current.zones.runes.filter((r) => !r.floating)
@@ -374,7 +376,7 @@ export default function Session({ id, view, user }) {
   }
   const P = {
     cards, mine, players, mySeat, bfSeats, settings, auto, setAuto, isHost, act, say, ui,
-    afford, place, targetPlay, attach, both: (id, dest, tgt) => place(id, dest, tgt),
+    freeRef, afford, place, targetPlay, attach, both: (id, dest, tgt) => place(id, dest, tgt),
     markFns,
     arrow: (id, tid) => act((p) => toggleTarget(p, id, tid)),
     fx: (id, tid) => act((p) => addFx(p, id, tid)),

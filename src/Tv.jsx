@@ -37,24 +37,17 @@ function Zone({ title, count, className = '', style, children }) {
   )
 }
 
-function Mini({ label, count, top, hide }) {
-  const g = useG()
-  const card = top && !hide ? g.cards[top.cardId] : null
-  return (
-    <div className={'mini' + (count ? '' : ' empty')}>
-      {count > 0 && (card ? <img src={card.image_url} alt="" draggable={false} /> : <div className="back" />)}
-      <span className="mini-l">{label}{count != null ? ` · ${count}` : ''}</span>
-    </div>
-  )
-}
+const RUNE_COL = { Fury: '#ff4d3d', Calm: '#2fd6a0', Mind: '#4da3ff', Body: '#ff9a2e', Chaos: '#b86bff', Order: '#ffd93b' }
 
-function Runes({ list, width, cw }) {
+// Runen am Fernseher als Punkte: bereit = in Runenfarbe gefüllt, getappt = leerer Kreis
+function RuneDots({ list, d }) {
   const g = useG()
-  const n = list.length
-  const step = n <= 1 ? 0 : Math.min(cw + 6, Math.max(8, (width - cw) / (n - 1)))
   return (
-    <div className="runerow" style={{ '--ovr': Math.max(0, Math.round(cw - step)) }}>
-      {list.map((inst) => <CardView key={inst.id} card={g.cards[inst.cardId]} inst={inst} handlers={g.bindCard(null, 'runes', inst)} />)}
+    <div className="rdots" style={{ '--d': d + 'px' }}>
+      {list.map((r) => {
+        const col = r.floating ? '#ffffff' : RUNE_COL[g.cards[r.cardId]?.color] || '#cfd8e6'
+        return <i key={r.id} className={'rdot' + (r.tapped ? ' off' : ' on')} style={{ '--rc': col }} />
+      })}
     </div>
   )
 }
@@ -64,34 +57,25 @@ function Points({ pts }) {
   return <span className="ptrack" aria-label={`${pts} Punkte`}>{Array.from({ length: slots }, (_, i) => <i key={i} className={i < pts ? 'lit' : ''} />)}</span>
 }
 
-function PlayerRow({ player, cw, W, color }) {
+function PlayerRow({ player, cw, W, color, rowH }) {
   const g = useG()
   if (!player.state) {
     return <div className="prow wait" style={{ '--sc': color }}><span className="muted">{player.name}: wählt noch ein Deck…</span></div>
   }
   const z = player.state.zones
-  const mw = Math.floor(cw * 0.5)
-  const pw = mw * 2 + GAP + 8
+  const d = clamp(Math.floor((rowH - 56) / 3), 20, 56)
+  const rw = d * 4 + 3 * 8 + 18
   const lw = cw * 2 + GAP + 14
-  const rw = Math.round(cw * 3.5)
-  const bw = Math.max(cw, W - pw - rw - lw - 3 * 8 - 16)
+  const bw = Math.max(cw, W - rw - lw - 2 * 8 - 16)
   const ready = z.runes.filter((r) => !r.tapped).length
-  const top = (arr) => (arr.length ? arr[arr.length - 1] : null)
-  const showTrash = g.settings.trashTop || player.seat === g.mySeat
   const pts = player.state.points || 0
+  const showHand = g.settings.handCount || player.seat === g.mySeat
   return (
-    <div className="prow" style={{ '--sc': color, gridTemplateColumns: `${pw}px ${rw}px ${bw}px ${lw}px` }}>
-      <Zone title="" className="piles">
-        <div className="minigrid" style={{ '--mw': mw + 'px' }}>
-          <Mini label="Runen" count={z.runeDeck.length} top={z.runeDeck[0]} hide />
-          <Mini label="Deck" count={z.deck.length} top={z.deck[0]} hide />
-          <Mini label="Trash" count={z.trash.length} top={top(z.trash)} hide={!showTrash} />
-          <Mini label="Banish" count={z.banish.length} top={top(z.banish)} />
-        </div>
-      </Zone>
-      <Zone title="Runen" count={`${ready}/${z.runes.length}`} className="runes"><Runes list={z.runes} width={rw - 12} cw={cw} /></Zone>
-      <Zone title={<><span className="dot" style={{ background: color }} /><b>{player.name}</b><Points pts={pts} />
-        <span className="muted small">{pts} Punkte{(g.settings.handCount || player.seat === g.mySeat) ? ` · Hand ${z.hand.length}` : ''}</span></>} className="base">
+    <div className="prow" style={{ '--sc': color, gridTemplateColumns: `${rw}px ${bw}px ${lw}px` }}>
+      <Zone title={<span className="bignum"><span className="muted">Runen</span> <b>{ready}</b><span className="muted">/{z.runes.length}</span></span>} className="runes"><RuneDots list={z.runes} d={d} /></Zone>
+      <Zone title={<><span className="dot" style={{ background: color }} /><b className="pname">{player.name}</b>
+        <span className="bigpts" title="Punkte">{pts}</span><Points pts={pts} />
+        {showHand && <span className="bignum"><span className="muted">Hand</span> <b>{z.hand.length}</b></span>}</>} className="base">
         {z.base.length
           ? <Flow list={z.base} width={bw - 12} cw={cw}><CardList seat={player.seat} zone="base" list={z.base} /></Flow>
           : <span className="muted small">Base leer</span>}
@@ -181,7 +165,7 @@ export function TvTable({ players, headH = 56 }) {
   const rows = two ? 4 : Math.max(1, players.length) + Math.max(1, bfs.length)
   const H = h - headH - 10
   const rowH = Math.floor((H - GAP * (rows - 1)) / rows)
-  const cw0 = Math.floor((rowH - 30) / 1.4)
+  const cw0 = Math.floor((rowH - 54) / 1.4)
   // Breite begrenzt die Kartengröße zusätzlich (Stack rechts + 4 Spalten)
   const cw = clamp(Math.min(cw0, Math.floor((w - 80) / 9.6)), 34, 210)
   // Stack: schmal, solange er leer ist; mit Karten passt sich die Breite an die Kartengröße an, sodass kein Scrollen nötig ist
@@ -197,7 +181,7 @@ export function TvTable({ players, headH = 56 }) {
   const Wf = w - 14
   const topP = players.slice(0, nTop)
   const botP = players.slice(nTop)
-  const prow = (p) => <PlayerRow key={p.seat} player={p} cw={cw} W={Wf} color={seatColor(p.seat)} />
+  const prow = (p) => <PlayerRow key={p.seat} player={p} cw={cw} W={Wf} color={seatColor(p.seat)} rowH={rowH} />
   return (
     <div className="tv2" style={{ '--cw': cw + 'px', '--rowh': rowH + 'px', '--stw': stw + 'px', height: h - headH }}>
       {topP.map(prow)}

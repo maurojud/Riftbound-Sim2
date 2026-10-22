@@ -36,6 +36,7 @@ const P = {
   back: <path d="M15 5 8 12l7 7" />,
   plus: <path d="M12 5v14M5 12h14" />,
   minus: <path d="M5 12h14" />,
+  nocost: <><path d="M13 2 4.5 13.500H11L10 22l8.5-11.500H12.500z" /><path d="M3 3l18 18" /></>,
   zap: <path d="M13 2 4.5 13.500H11L10 22l8.5-11.500H12.500z" />,
 }
 export function Icon({ n, size = 24, className = '' }) {

@@ -147,3 +147,28 @@ html, body { overscroll-behavior: none; }
 .prow, .band, .tv2-mid, .tv2-main { flex: none; }
 .tv2-stack { position: relative; }
 .tv2-stack > .stackcol { position: absolute !important; top: 0; left: 0; right: 0; bottom: 0; width: auto !important; height: auto; }
+.ph-tabs { display: flex; gap: 6px; padding: 6px 8px; background: #0b1018; border-bottom: 1px solid var(--line); }
+.ph-tabs button { position: relative; flex: 1; min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 4px; border-radius: 12px; background: #1c2735; border: 1px solid var(--line); color: var(--ink); padding: 0; }
+.ph-tabs button.on { background: var(--gold); color: #1b1608; border-color: var(--gold); }
+.ph-tabs b { font-size: .9rem; }
+.hhide { position: absolute; top: 3px; left: 3px; width: 34px; height: 34px; min-height: 0; padding: 0; border-radius: 50%; display: grid; place-items: center; background: #000c; border: 1px solid #ffffff55; color: #fff; z-index: 2; }
+.hhide.on { background: var(--gold); color: #1b1608; border-color: var(--gold); }
+.hcard.tapped { opacity: .55; transform: rotate(4deg); }
+.bfstrip { display: block; width: 62%; margin: 0 auto 10px; padding: 0; background: none; border: 0; min-height: 0; }
+.bfstrip img { width: 100%; border-radius: 8px; display: block; }
+.oppzone { margin-top: 14px; }
+.oppzone h4 { margin: 0 0 6px; font-size: .85rem; display: flex; gap: 6px; align-items: center; }
+.tv2-main.two { flex-direction: row; gap: 8px; }
+.bfcol { position: relative; flex: none; }
+.bfhalf { position: absolute; left: 0; right: 0; box-sizing: border-box; padding: 3px 6px; border: 1px solid var(--line); border-top: 3px solid var(--sc, var(--line)); border-radius: 10px; background: #ffffff08; z-index: 2; overflow: visible; display: flex; flex-direction: column; }
+.bfhalf.top { top: 0; }
+.bfhalf.bot { bottom: 0; border-top-width: 1px; border-bottom: 3px solid var(--sc, var(--line)); }
+.bfhalf.bot .halft { order: 2; margin-top: auto; }
+.bfhalf.bot .ovflow { order: 1; }
+.bfhalf .ovflow { flex: 1; }
+.bfhalf.top .ovflow { align-items: flex-start; }
+.bfhalf.bot .ovflow { align-items: flex-end; }
+.bfcenter { position: absolute; left: 50%; z-index: 1; display: grid; place-items: center; }
+.bfcard2 { position: relative; }
+.bfcard2 .card.land { width: calc(var(--cw) * 1.4); }
+.bfcard2 .card { --w: calc(var(--cw) * 1.4); width: var(--w); }

@@ -132,6 +132,43 @@ function Band({ bf, players, cw, W }) {
   return <div className="band">{order}</div>
 }
 
+// Zwei Spieler: Battlefields stehen nebeneinander in der Mitte. Oben die Einheiten des oberen Spielers, unten die des unteren; die Karte liegt dazwischen.
+function MidBoard({ bfs, players, cw, W, rowH }) {
+  const g = useG()
+  const n = Math.max(1, bfs.length)
+  const colW = Math.floor((W - (n - 1) * 8) / n)
+  const bfw = Math.min(Math.round(cw * 1.7), colW - 12)
+  const bfh = Math.round(bfw / 1.4)
+  const half = (p, key, pos) => {
+    const list = (p.state?.zones.bfUnits || []).filter((i) => String(i.at) === String(key))
+    return (
+      <div className={'bfhalf ' + pos} style={{ '--sc': seatColor(p.seat), height: rowH }}>
+        <div className="halft"><span className="dot" style={{ background: seatColor(p.seat) }} />{p.name}</div>
+        {list.length > 0 && <Flow list={list} width={colW - 14} cw={cw}><CardList seat={p.seat} zone="bfUnits" list={list} /></Flow>}
+      </div>
+    )
+  }
+  return (
+    <>
+      {bfs.map((bf) => {
+        const overs = g.players.flatMap((p) => (p.state?.zones.bfExtra || []).filter((i) => i.ovr === String(bf.key)).map((inst) => ({ seat: p.seat, inst })))
+        return (
+          <div key={bf.key} className="bfcol" style={{ width: colW, height: rowH * 2 + 4 }}>
+            {half(players[0], bf.key, 'top')}
+            <div className="bfcenter" style={{ top: rowH + 2 - bfh / 2, width: bfw, height: bfh, marginLeft: -bfw / 2 }}>
+              <div className="bfcard2" style={{ '--cw': Math.round(bfw / 1.4) + 'px' }}>
+                <CardView card={g.cards[bf.inst.cardId]} inst={bf.inst} handlers={g.bindCard(bf.owner.seat, bf.extra ? 'bfExtra' : 'battlefield', bf.inst)} />
+                {overs.map((o, i) => <div key={o.inst.id} className="bfover" style={{ '--n': i }}><CardView card={g.cards[o.inst.cardId]} inst={o.inst} owner={o.seat} handlers={g.bindCard(o.seat, 'bfExtra', o.inst)} /></div>)}
+              </div>
+            </div>
+            {half(players[1], bf.key, 'bot')}
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 export function TvTable({ players, headH = 56 }) {
   const { w, h } = useViewport()
   const bfs = [
@@ -139,7 +176,8 @@ export function TvTable({ players, headH = 56 }) {
     ...extraBattlefields(players).map((x) => ({ key: 'x' + x.inst.id, owner: x.owner, inst: x.inst, extra: true })),
   ]
   const nTop = Math.floor(players.length / 2)
-  const rows = Math.max(1, players.length) + Math.max(1, bfs.length)
+  const two = players.length === 2
+  const rows = two ? 4 : Math.max(1, players.length) + Math.max(1, bfs.length)
   const H = h - headH - 10
   const rowH = Math.floor((H - GAP * (rows - 1)) / rows)
   const cw0 = Math.floor((rowH - 30) / 1.4)
@@ -155,8 +193,8 @@ export function TvTable({ players, headH = 56 }) {
     <div className="tv2" style={{ '--cw': cw + 'px', '--rowh': rowH + 'px', '--stw': stw + 'px', height: h - headH }}>
       {topP.map(prow)}
       <div className="tv2-mid">
-        <div className="tv2-main" style={{ width: Wc }}>
-          {bfs.length
+        <div className={'tv2-main' + (two && bfs.length ? ' two' : '')} style={{ width: Wc }}>
+          {two && bfs.length ? <MidBoard bfs={bfs} players={players} cw={cw} W={Wc} rowH={rowH} /> : bfs.length
             ? bfs.map((b) => <Band key={b.key} bf={b} players={players} cw={cw} W={Wc} />)
             : <div className="band empty"><span className="muted">Battlefields werden gewählt…</span></div>}
         </div>

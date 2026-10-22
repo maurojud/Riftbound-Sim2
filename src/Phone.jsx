@@ -93,7 +93,7 @@ function Cost({ aff }) {
 }
 
 // ───────── Karte aus Hand oder Championzone spielen: Platzieren | Targeten | Beides ─────────
-function PlaySheet({ P, inst, zone, onClose }) {
+function PlaySheet({ P, inst, zone, onClose, move, onDetail }) {
   const [tab, setTab] = useState('place')
   const [dest, setDest] = useState(null)
   const [tgt, setTgt] = useState(null)
@@ -111,6 +111,8 @@ function PlaySheet({ P, inst, zone, onClose }) {
     allowed.includes('base') && { key: 'base', icon: 'base', label: 'Base' },
     ...allowed.filter((t) => t.startsWith('bf:')).map((t) => ({ key: t, icon: 'flag', label: bfName(t.slice(3)) })),
     allowed.includes('stack') && { key: 'stack', icon: 'stack', label: 'Stack' },
+    ...(move ? [['hand', 'hand', 'Hand'], ['champion', 'champion', 'Champion'], ['trash', 'trash', 'Trash'], ['banish', 'banish', 'Banish'], ['deck', 'top', 'Deck oben']]
+      .filter(([k]) => allowed.includes(k)).map(([key, icon, label]) => ({ key, icon, label })) : []),
   ].filter(Boolean)
   const hasHosts = allowed.some((t) => t.startsWith('card:'))
   const go = (fn) => { fn(); onClose() }
@@ -126,12 +128,12 @@ function PlaySheet({ P, inst, zone, onClose }) {
   )
   const confirm = () => go(() => P.both(inst.id, dest, tgt))
   return (
-    <Sheet title={card?.name || 'Karte'} onClose={onClose} head={<><Cost aff={aff} />{canHide(card, zone) && <IconBtn n={inst.faceDown ? 'eyeoff' : 'eye'} label="Verdeckt spielen" on={inst.faceDown} className="sm" onClick={() => P.act((p) => toggleFlag(p, inst.id, 'faceDown'))} />}</>}>
-      <div className="tabs3" role="tablist">
+    <Sheet title={card?.name || 'Karte'} onClose={onClose} head={<>{!move && <Cost aff={aff} />}{move && onDetail && <IconBtn n="edit" label="Details und Werte" className="sm" onClick={onDetail} />}{canHide(card, zone) && <IconBtn n={inst.faceDown ? 'eyeoff' : 'eye'} label="Verdeckt spielen" on={inst.faceDown} className="sm" onClick={() => P.act((p) => toggleFlag(p, inst.id, 'faceDown'))} />}</>}>
+      {!move && <div className="tabs3" role="tablist">
         {[['place', 'place', 'Platzieren'], ['target', 'aim', 'Targeten'], ['both', 'both', 'Beides']].map(([k, ic, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)} aria-label={l}><Icon n={ic} size={28} /></button>
         ))}
-      </div>
+      </div>}
       {tab === 'place' && (<>
         <DestChips />
         {host && <><p className="muted small hint">An welche Einheit?</p><TargetList P={P} excludeId={inst.id} onlyOwn onPick={(h) => go(() => P.attach(inst.id, h.id))} /></>}
@@ -257,19 +259,78 @@ function RuneTile({ P, inst, open }) {
 }
 
 // ───────── Hauptansicht ─────────
-function HandCard({ P, inst, onTap, onLong }) {
+function HandCard({ P, inst, zone = 'hand', onTap, onLong }) {
   const lp = useLongPress(onTap, onLong)
   const card = P.cards[inst.cardId]
+  const stop = (e) => e.stopPropagation()
   return (
-    <div className="hcard" {...lp} role="button" tabIndex={0} aria-label={card?.name || 'Karte'} data-hand={inst.id}>
+    <div className={'hcard' + (inst.tapped ? ' tapped' : '')} {...lp} role="button" tabIndex={0} aria-label={card?.name || 'Karte'} data-hand={inst.id}>
       {card ? <CardImg src={card.image_url} alt={card.name} battlefield={kindOf(card) === 'battlefield'} /> : <div className="back" />}
-      {inst.faceDown && <span className="hbadge"><Icon n="eyeoff" size={16} /></span>}
+      {zone === 'hand' && card && canHide(card, 'hand') && (
+        <button type="button" className={'hhide' + (inst.faceDown ? ' on' : '')} aria-label="Verdeckt spielen" onPointerDown={stop} onPointerUp={stop} onClick={(e) => { e.stopPropagation(); P.act((p) => toggleFlag(p, inst.id, 'faceDown')) }}>
+          <Icon n={inst.faceDown ? 'eyeoff' : 'eye'} size={20} />
+        </button>
+      )}
+      {zone !== 'hand' && inst.faceDown && <span className="hbadge"><Icon n="eyeoff" size={16} /></span>}
     </div>
+  )
+}
+
+function bfInstOf(P, key) {
+  if (typeof key === 'number') return P.players.find((p) => p.seat === key)?.state?.zones.battlefield[0]
+  return P.players.flatMap((p) => p.state?.zones.bfExtra || []).find((i) => 'x' + i.id === key)
+}
+
+// Eine Zone als Reiter: eigene Karten groß (Tippen = verschieben, lang = Details), Karten der Gegner klein darunter
+function ZoneView({ P, tab, open, openMove }) {
+  const mine = P.mine.zones
+  let own = [], others = [], bf = null
+  if (tab === 'base') {
+    own = mine.base
+    others = P.players.filter((p) => p.seat !== P.mySeat && p.state).map((p) => ({ p, list: p.state.zones.base }))
+  } else {
+    bf = bfInstOf(P, tab)
+    const at = (z) => (z.bfUnits || []).filter((i) => String(i.at) === String(tab))
+    own = at(mine)
+    others = P.players.filter((p) => p.seat !== P.mySeat && p.state).map((p) => ({ p, list: at(p.state.zones) }))
+  }
+  const bfCard = bf && P.cards[bf.cardId]
+  return (
+    <>
+      {bfCard && (
+        <button className="bfstrip" onClick={() => open(ownerOf(P, bf.id), bf.id)} aria-label={bfCard.name}>
+          <CardImg src={bfCard.image_url} alt={bfCard.name} battlefield />
+        </button>
+      )}
+      {own.length === 0 && <p className="muted center pad"><Icon n={tab === 'base' ? 'base' : 'flag'} size={28} /></p>}
+      <div className="hgrid">
+        {own.map((inst) => (
+          <HandCard key={inst.id} P={P} inst={inst} zone={tab === 'base' ? 'base' : 'bfUnits'} onTap={() => openMove(inst.id)} onLong={() => open(P.mySeat, inst.id)} />
+        ))}
+      </div>
+      {others.filter((o) => o.list.length).map(({ p, list }) => (
+        <div key={p.seat} className="oppzone">
+          <h4 style={{ color: seatColor(p.seat) }}><span className="dot" style={{ background: seatColor(p.seat) }} /> {p.name}</h4>
+          <div className="thumbs">
+            {list.map((inst) => {
+              const c = P.cards[inst.cardId]
+              const hidden = !c || inst.faceDown
+              return (
+                <button key={inst.id} className={'thumb2' + (inst.tapped ? ' tapped' : '')} onClick={() => open(p.seat, inst.id)} aria-label={hidden ? 'Verdeckt' : c.name}>
+                  {hidden ? <div className="back" /> : <CardImg src={c.image_url} alt={c.name} />}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </>
   )
 }
 
 export default function PhoneApp({ P, onLeave }) {
   const [sheet, setSheet] = useState(null)
+  const [tab, setTab] = useState('hand')
   const close = () => setSheet(null)
   const hand = P.mine.zones.hand
   const stackN = stackEntries(P.players).length
@@ -309,16 +370,28 @@ export default function PhoneApp({ P, onLeave }) {
           <IconBtn n="menu" label="Menü" className="big" onClick={() => setSheet({ t: 'menu' })} />
         </div>
       </header>
+      <nav className="ph-tabs" role="tablist">
+        {[['hand', 'hand', hand.length, null], ['base', 'base', P.mine.zones.base.length, null],
+          ...P.bfSeats.map((k, i) => [k, 'flag', P.players.flatMap((p) => (p.state?.zones.bfUnits || []).filter((u) => String(u.at) === String(k))).length, i + 1])].map(([k, ic, n, num]) => (
+          <button key={String(k)} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)} aria-label={String(k)}>
+            <Icon n={ic} size={26} />{num != null && <b>{num}</b>}{n > 0 && <span className="ibadge">{n}</span>}
+          </button>
+        ))}
+      </nav>
       <main className="ph-hand">
-        {hand.length === 0 && <p className="muted center pad">Keine Handkarten. Tippe auf das Deck-Symbol, um zu ziehen.</p>}
-        <div className="hgrid">
-          {hand.map((inst) => (
-            <HandCard key={inst.id} P={P} inst={inst} onTap={() => setSheet({ t: 'play', id: inst.id, zone: 'hand' })} onLong={() => openDetail(P.mySeat, inst.id)} />
-          ))}
-        </div>
+        {tab === 'hand' ? (
+          <>
+            {hand.length === 0 && <p className="muted center pad">Keine Handkarten. Tippe auf das Deck-Symbol, um zu ziehen.</p>}
+            <div className="hgrid">
+              {hand.map((inst) => (
+                <HandCard key={inst.id} P={P} inst={inst} onTap={() => setSheet({ t: 'play', id: inst.id, zone: 'hand' })} onLong={() => openDetail(P.mySeat, inst.id)} />
+              ))}
+            </div>
+          </>
+        ) : <ZoneView P={P} tab={tab} open={openDetail} openMove={(id) => setSheet({ t: 'play', id, zone: 'move' })} />}
       </main>
 
-      {sheet?.t === 'play' && (() => { const f = findInst(P.mine, sheet.id); return f ? <PlaySheet key={sheet.id} P={P} inst={f.inst} zone={f.zone} onClose={close} /> : null })()}
+      {sheet?.t === 'play' && (() => { const f = findInst(P.mine, sheet.id); return f ? <PlaySheet key={sheet.id} P={P} inst={f.inst} zone={f.zone} onClose={close} move={!['hand', 'champion'].includes(f.zone)} onDetail={() => openDetail(P.mySeat, f.inst.id)} /> : null })()}
       {sheet?.t === 'detail' && <DetailSheet key={sheet.id} P={P} seat={sheet.seat} id={sheet.id} onClose={close} />}
       {sheet?.t === 'inplay' && (
         <Sheet title="Karten im Spiel" onClose={close} tall>

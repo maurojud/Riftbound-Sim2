@@ -84,10 +84,10 @@ function randInt(n) {
   return buf[0] % n
 }
 
-// Mischen: 20 bis 30 Durchgänge Fisher-Yates mit echtem Zufall (jede Reihenfolge gleich wahrscheinlich)
-export function shuffled(arr) {
+// Mischen: 20 bis 30 Durchgänge (oder die angegebene Zahl) Fisher-Yates mit echtem Zufall (jede Reihenfolge gleich wahrscheinlich)
+export function shuffled(arr, fixedPasses) {
   const r = [...arr]
-  const passes = 20 + randInt(11)
+  const passes = fixedPasses || 20 + randInt(11)
   for (let k = 0; k < passes; k++) {
     for (let i = r.length - 1; i > 0; i--) {
       const j = randInt(i + 1)
@@ -172,6 +172,18 @@ export function fixState(s) {
   return { ...s, zones: { ...s.zones, bfUnits: s.zones.bfUnits || [], stack: s.zones.stack || [], bfExtra: s.zones.bfExtra || [] } }
 }
 
+function roundRobin(list) {
+  const by = new Map()
+  for (const inst of list) { if (!by.has(inst.cardId)) by.set(inst.cardId, []); by.get(inst.cardId).push(inst) }
+  const out = []
+  for (let round = 0; ; round++) {
+    let any = false
+    for (const arr of by.values()) if (arr[round]) { out.push(arr[round]); any = true }
+    if (!any) break
+  }
+  return out
+}
+
 export function buildPlayer(deck, cardsById, settings = DEFAULT_SETTINGS) {
   const zones = emptyZones()
   let champId = null
@@ -188,8 +200,9 @@ export function buildPlayer(deck, cardsById, settings = DEFAULT_SETTINGS) {
       else zones.deck.push(inst)
     }
   }
-  zones.deck = shuffled(zones.deck)
-  zones.runeDeck = shuffled(zones.runeDeck)
+  // Geordnete Ausgangslage: erst jede Karte einmal, dann alle mit mindestens 2 Kopien, dann alle mit 3 – danach 5 Mischdurchgänge
+  zones.deck = shuffled(roundRobin(zones.deck), 5)
+  zones.runeDeck = shuffled(roundRobin(zones.runeDeck), 5)
   if (settings.battlefieldRandom && zones.bfPool.length) {
     const pick = Math.floor(Math.random() * zones.bfPool.length)
     zones.battlefield.push(zones.bfPool.splice(pick, 1)[0])
@@ -730,7 +743,8 @@ export function moveAuto(p, instId, to, cards, auto = {}) {
   if (!auto.exhaust) return n
   const card = cards[f.inst.cardId]
   const enters = (f.zone === 'hand' || f.zone === 'champion') && isBoardTarget(to) && entersTapped(card)
-  const moves = f.zone === 'base' && to.startsWith('bf:') && unitLike(card)
+  // Jede Bewegung auf dem Spielfeld (Base, Battlefield, zurück) tappt die Karte; Battlefield, Legend und Runen nie
+  const moves = BOARD.includes(f.zone) && isBoardTarget(to) && f.zone !== to && !['battlefield', 'legend', 'rune'].includes(kindOf(card))
   return enters || moves ? exhaust(n, instId) : n
 }
 export const isBfToken = (card) => kindOf(card) === 'token' && String(card?.token_type || '').toLowerCase() === 'battlefield'

@@ -5,6 +5,7 @@ import { KINDS, COLORS, parseCardFilename, allowsSecondColor, colorsOf as colors
 const TOKEN_TYPES = ['Unit', 'Gear', 'Spell', 'Battlefield', 'Other']
 const LEGEND_KINDS = ['Unit', 'Champion', 'Spell', 'Gear', 'Token']
 import { parseSetNumber, extractCode, fetchCardInfo, mapApiCard } from './cardlookup'
+import { buildIndex, loadStore, saveStore, lookupLocal, storeSummary } from './csvcards'
 import CardImg from './CardImg'
 import Pager, { usePaging, pageSlice } from './Pager'
 
@@ -22,6 +23,8 @@ export default function Admin({ user }) {
   const [queue, setQueue] = useState([])
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  const [csvSet, setCsvSet] = useState(() => { try { return localStorage.getItem('rt:csvset') || 'RAD' } catch { return 'RAD' } })
+  const [csvInfo, setCsvInfo] = useState(() => storeSummary())
   const [q, setQ] = useState('')
   const [fkind, setFkind] = useState('')
   const [fcolor, setFcolor] = useState('')
@@ -69,16 +72,32 @@ export default function Admin({ user }) {
     const update = (patch) => setQueue((qq) => qq.map((r) => (r.key === key ? { ...r, ...patch } : r)))
     update({ status: 'lookup' })
     try {
-      const c = await fetchCardInfo(sn.set, sn.num)
+      // Zuerst die eingelesene CSV-Liste (schnell, kennt auch neue Sets), danach die Online-Datenbank
+      const local = lookupLocal(sn.set, sn.num)
+      let c = local
+      if (!c) { try { c = await fetchCardInfo(sn.set, sn.num) } catch { c = null } }
       if (!c) { update({ ...(fallbackName ? { name: fallbackName.replace(/\.[^.]+$/, '') } : {}), status: 'notfound' }); return }
       const m = mapApiCard(c)
       update({
         name: m.name, kind: m.kind, color: m.color, color2: m.color2, signature: m.signature, code: m.code, energy: m.energy, might: m.might, power: m.power, powerColors: m.powerColors, status: 'found',
-        note: m.ignoredDomain ? `Datenbank nennt 2 Farben, übernommen wird nur ${m.color} (zweite Farbe nur bei Legend/Signature)` : '',
+        note: local ? 'Werte aus der CSV-Liste' + (m.ignoredDomain ? '; zweite Farbe nur bei Legend/Signature' : '') : m.ignoredDomain ? `Datenbank nennt 2 Farben, übernommen wird nur ${m.color} (zweite Farbe nur bei Legend/Signature)` : '',
       })
     } catch (e) {
       update({ status: 'error' })
     }
+  }
+  // CSV-Kartenliste einlesen und merken; schon gewählte Bilder ohne Treffer werden gleich nochmal abgeglichen
+  async function loadCsv(file) {
+    try {
+      const idx = buildIndex(await file.text(), csvSet.trim() || 'RAD')
+      const n = Object.keys(idx).length
+      if (!n) { setMsg('In der Datei wurden keine Karten gefunden.'); return }
+      saveStore({ ...loadStore(), ...idx })
+      try { localStorage.setItem('rt:csvset', csvSet.trim()) } catch { /* egal */ }
+      setCsvInfo(storeSummary())
+      setMsg(`${n} Karten aus der Liste gelesen (Set ${csvSet.trim().toUpperCase()}).`)
+      for (const r of queue.filter((x) => x.sn && x.status !== 'found')) await lookupRow(r.key, r.sn, r.file.name)
+    } catch (e) { setMsg(String(e.message || e)) }
   }
   const edit = (key, patch) =>
     setQueue((qq) => qq.map((r) => {
@@ -275,6 +294,15 @@ export default function Admin({ user }) {
           </label>
           <input type="file" accept="image/*" multiple disabled={busy}
             onChange={(e) => { choose(e.target.files); e.target.value = '' }} />
+        </div>
+        <div className="row">
+          <label>Set-Kürzel der Liste
+            <input value={csvSet} maxLength={4} style={{ width: 70 }} onChange={(e) => setCsvSet(e.target.value.toUpperCase())} />
+          </label>
+          <label>Kartenliste (CSV) einlesen
+            <input type="file" accept=".csv,text/csv" onChange={(e) => { if (e.target.files[0]) loadCsv(e.target.files[0]); e.target.value = '' }} />
+          </label>
+          {Object.keys(csvInfo).length > 0 && <span className="muted small">Gespeichert: {Object.entries(csvInfo).map(([k, n]) => `${k} ${n}`).join(', ')}</span>}
         </div>
 
         {rows.length > 0 && (
